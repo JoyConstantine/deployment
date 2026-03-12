@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑发布任务 - 集群版本发布系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .header .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .header .user-info span {
+            margin-right: 15px;
+        }
+        .header .user-info a {
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+        }
+        .nav {
+            background-color: #4CAF50;
+            padding: 10px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        .btn-submit {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .btn-submit:hover {
+            background-color: #45a049;
+        }
+        .error-message {
+            color: red;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>集群版本发布系统</h1>
+        <div class="user-info">
+            <span>欢迎，{{ user.username }}</span>
+            <a href="{% url 'logout' %}">退出登录</a>
+        </div>
+    </div>
+    <div class="nav">
+        <a href="{% url 'index' %}">首页</a>
+        <a href="{% url 'nodes' %}">节点管理</a>
+        <a href="{% url 'groups' %}">分组管理</a>
+        <a href="{% url 'tasks' %}">发布任务</a>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h2>编辑发布任务</h2>
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="name">任务名称</label>
+                    <input type="text" id="name" name="name" value="{{ task.name }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="version">版本号</label>
+                    <input type="text" id="version" name="version" value="{{ task.version }}" required placeholder="例如：v1.0.0">
+                </div>
+                <div class="form-group">
+                    <label>发布内容来源</label>
+                    <input type="text" value="{{ task.get_source_type_display }}" disabled>
+                </div>
+                <div class="form-group">
+                    <label for="target_directory">目标目录</label>
+                    <input type="text" id="target_directory" name="target_directory" value="{{ task.target_directory }}" required placeholder="例如：/opt/app">
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; font-weight: normal;">
+                        <input type="checkbox" id="full_deployment" name="full_deployment" {% if task.gray_ratio >= 1.0 %}checked{% endif %} style="margin-right: 10px; width: auto;">
+                        全量发布（选择分组的全部主机）
+                    </label>
+                </div>
+                <div class="form-group" id="groups-section">
+                    <label for="groups">目标分组</label>
+                    <select id="groups" name="groups" multiple required>
+                        {% for group in groups %}
+                        <option value="{{ group.id }}" {% if group.id in current_group_ids %}selected{% endif %}>{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" id="gray-section">
+                    <label for="gray_ratio">灰度比例</label>
+                    <input type="number" id="gray_ratio" name="gray_ratio" min="0" max="99" step="10" value="{{ task.gray_ratio|floatformat:0 }}" required>
+                    <span style="margin-left: 10px;">%</span>
+                </div>
+                <script>
+                    // 处理全量发布选项
+                    document.getElementById('full_deployment').addEventListener('change', function() {
+                        if (this.checked) {
+                            document.getElementById('gray-section').style.display = 'none';
+                            document.getElementById('gray_ratio').required = false;
+                        } else {
+                            document.getElementById('gray-section').style.display = 'block';
+                            document.getElementById('gray_ratio').required = true;
+                        }
+                    });
+                    
+                    // 初始化状态
+                    window.onload = function() {
+                        if (document.getElementById('full_deployment').checked) {
+                            document.getElementById('gray-section').style.display = 'none';
+                            document.getElementById('gray_ratio').required = false;
+                        }
+                    };
+                </script>
+                <div class="form-group">
+                    <label for="post_deploy_action">发布后动作</label>
+                    <input type="text" id="post_deploy_action" name="post_deploy_action" value="{{ task.post_deploy_action }}" placeholder="例如：systemctl restart edge_client">
+                    <small style="color: #666; display: block; margin-top: 5px;">发布完成后执行的命令，非必填项</small>
+                </div>
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; font-weight: normal;">
+                        <input type="checkbox" name="allow_downgrade" style="margin-right: 10px; width: auto;">
+                        允许降级发布
+                    </label>
+                    <small style="color: #666; margin-left: 25px;">勾选后，即使任务版本低于节点当前版本也会执行发布</small>
+                </div>
+                {% if error_message %}
+                <div class="error-message">{{ error_message }}</div>
+                {% endif %}
+                <button type="submit" class="btn-submit">保存修改</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

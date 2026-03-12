@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务详情 - 集群版本发布系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .header .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .header .user-info span {
+            margin-right: 15px;
+        }
+        .header .user-info a {
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+        }
+        .nav {
+            background-color: #4CAF50;
+            padding: 10px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 10px;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .status-success {
+            color: green;
+            font-weight: bold;
+        }
+        .status-failed {
+            color: red;
+            font-weight: bold;
+        }
+        .status-running {
+            color: blue;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: orange;
+            font-weight: bold;
+        }
+        .log-info {
+            color: #333;
+        }
+        .log-success {
+            color: green;
+        }
+        .log-error {
+            color: red;
+        }
+        .action-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-back {
+            background-color: #2196F3;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>集群版本发布系统</h1>
+        <div class="user-info">
+            <span>欢迎，{{ user.username }}</span>
+            <a href="{% url 'logout' %}">退出登录</a>
+        </div>
+    </div>
+    <div class="nav">
+        <a href="{% url 'index' %}">首页</a>
+        <a href="{% url 'nodes' %}">节点管理</a>
+        <a href="{% url 'groups' %}">分组管理</a>
+        <a href="{% url 'tasks' %}">发布任务</a>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h2>任务详情</h2>
+            <div style="margin-bottom: 20px;">
+                <h3>{{ task.name }} v{{ task.version }}</h3>
+                <p><strong>状态：</strong>{{ task.get_status_display }}</p>
+                <p><strong>灰度比例：</strong>{{ actual_gray_ratio|floatformat:0 }}%</p>
+                <p><strong>目标目录：</strong>{{ task.target_directory }}</p>
+                <p><strong>创建时间：</strong>{{ task.created_at|date:"Y-m-d H:i:s" }}</p>
+            </div>
+            
+            <h3>执行进度</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ progress }}%;">
+                    {{ progress|floatformat:0 }}%
+                </div>
+            </div>
+            <p style="text-align: right;">已完成 {{ completed_nodes }} / {{ total_nodes }} 个节点</p>
+            
+            <h3>节点执行状态</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>节点</th>
+                        <th>状态</th>
+                        <th>执行时间</th>
+                        <th>完成时间</th>
+                        <th>错误信息</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task_node in task_nodes %}
+                    <tr>
+                        <td>{{ task_node.node.hostname }} ({{ task_node.node.ip_address }})</td>
+                        <td>
+                            {% if task_node.status == 'success' %}
+                            <span class="status-success">成功</span>
+                            {% elif task_node.status == 'failed' %}
+                            <span class="status-failed">失败</span>
+                            {% elif task_node.status == 'running' %}
+                            <span class="status-running">执行中</span>
+                            {% else %}
+                            <span class="status-pending">待执行</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ task_node.executed_at|date:"Y-m-d H:i:s"|default:"-" }}</td>
+                        <td>{{ task_node.completed_at|date:"Y-m-d H:i:s"|default:"-" }}</td>
+                        <td>{{ task_node.error_message|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="card">
+            <h2>发布日志</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>节点</th>
+                        <th>操作</th>
+                        <th>状态</th>
+                        <th>消息</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                        <td>{{ log.node.hostname }}</td>
+                        <td>{{ log.action }}</td>
+                        <td>
+                            {% if log.status == 'success' %}
+                            <span class="log-success">成功</span>
+                            {% elif log.status == 'error' %}
+                            <span class="log-error">错误</span>
+                            {% else %}
+                            <span class="log-info">信息</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ log.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <a href="{% url 'tasks' %}" class="action-btn btn-back">返回任务列表</a>
+    </div>
+</body>
+</html>

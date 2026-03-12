@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>节点管理 - 集群版本发布系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+        .header .user-info {
+            display: flex;
+            align-items: center;
+        }
+        .header .user-info span {
+            margin-right: 15px;
+        }
+        .header .user-info a {
+            color: white;
+            text-decoration: none;
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            border-radius: 4px;
+        }
+        .nav {
+            background-color: #4CAF50;
+            padding: 10px;
+        }
+        .nav a {
+            color: white;
+            text-decoration: none;
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 20px;
+        }
+        .card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .status-active {
+            color: green;
+            font-weight: bold;
+        }
+        .status-inactive {
+            color: red;
+            font-weight: bold;
+        }
+        .action-btn {
+            padding: 5px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 5px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-edit {
+            background-color: #2196F3;
+            color: white;
+        }
+        .btn-delete {
+            background-color: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>集群版本发布系统</h1>
+        <div class="user-info">
+            <span>欢迎，{{ user.username }}</span>
+            <a href="{% url 'logout' %}">退出登录</a>
+        </div>
+    </div>
+    <div class="nav">
+        <a href="{% url 'index' %}">首页</a>
+        <a href="{% url 'nodes' %}">节点管理</a>
+        <a href="{% url 'groups' %}">分组管理</a>
+        <a href="{% url 'tasks' %}">发布任务</a>
+    </div>
+    <div class="content">
+        <div class="card">
+            <h2>节点列表</h2>
+            <form method="post" action="{% url 'batch_update_nodes' %}">
+                {% csrf_token %}
+                <div class="batch-actions" style="margin-bottom: 20px;">
+                    <label>批量操作：</label>
+                    <select name="action" required>
+                        <option value="">选择操作</option>
+                        <option value="assign_group">分配分组</option>
+                        <option value="delete">删除</option>
+                    </select>
+                    <select name="group" style="margin-left: 10px;">
+                        <option value="">选择分组</option>
+                        {% for group in groups %}
+                        <option value="{{ group.id }}">{{ group.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="action-btn btn-submit" style="margin-left: 10px;">执行</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th><input type="checkbox" id="select-all"></th>
+                            <th>节点ID</th>
+                            <th>主机名</th>
+                            <th>IP地址</th>
+                            <th>所属分组</th>
+                            <th>当前版本</th>
+                            <th>状态</th>
+                            <th>最后心跳</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for node in nodes %}
+                        <tr>
+                            <td><input type="checkbox" name="node_ids" value="{{ node.id }}"></td>
+                            <td>{{ node.node_id }}</td>
+                            <td>{{ node.hostname }}</td>
+                            <td>{{ node.ip_address }}</td>
+                            <td>{% if node.group %}{{ node.group.name }}{% else %}未分组{% endif %}</td>
+                            <td>{{ node.current_version }}</td>
+                            <td>
+                                {% if node.is_active %}
+                                <span class="status-active">活跃</span>
+                                {% else %}
+                                <span class="status-inactive">非活跃</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ node.last_heartbeat|date:"Y-m-d H:i:s" }}</td>
+                            <td>
+                                <a href="{% url 'edit_node' node.id %}" class="action-btn btn-edit">编辑</a>
+                                <a href="{% url 'delete_node' node.id %}" class="action-btn btn-delete" onclick="return confirm('确定要删除这个节点吗？');">删除</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </form>
+        </div>
+        <script>
+            // 全选/取消全选
+            document.getElementById('select-all').addEventListener('change', function() {
+                var checkboxes = document.querySelectorAll('input[name="node_ids"]');
+                checkboxes.forEach(function(checkbox) {
+                    checkbox.checked = this.checked;
+                }.bind(this));
+            });
+        </script>
+    </div>
+</body>
+</html>
